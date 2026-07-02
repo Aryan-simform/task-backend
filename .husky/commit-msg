@@ -1,0 +1,33 @@
+#!/bin/sh
+
+commit_msg_file="$1"
+types="feat|fix|ci|chore|docs|test|style|refactor|perf|build|revert"
+regex="^($types)[^:]*: .+"
+
+subject=$(head -n1 "$commit_msg_file")
+
+if ! echo "$subject" | grep -qE "$regex"; then
+  echo "Invalid commit message format"
+  echo ""
+  echo "Format: type(scope): message"
+  echo ""
+  echo "Examples:"
+  echo "  feat(auth): add OAuth login"
+  echo "  fix(ui): resolve navbar overflow"
+  echo "  docs(readme): update installation"
+  exit 1
+fi
+
+if [ ${#subject} -gt 70 ]; then
+  echo "Subject too long (${#subject}/100 chars)"
+  exit 1
+fi
+
+if tail -n +2 "$commit_msg_file" |
+  grep -v '^#' |
+  grep -vE 'https?://' |
+  grep -q '.\{100,\}'; then
+  echo "Body line exceeds 120 characters"
+  exit 1
+fi
+
