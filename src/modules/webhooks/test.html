@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avatar Upload Test</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; }
+        pre  { background: #f4f4f4; padding: 12px; border-radius: 6px; overflow: auto; white-space: pre-wrap; }
+        button { margin-top: 12px; padding: 8px 16px; cursor: pointer; }
+        #status { margin-top: 16px; color: #555; }
+    </style>
+</head>
+<body>
+    <h2>Cloudinary Pre-signed Upload Test</h2>
+
+    <!-- Step 1: paste a valid JWT from /auth/login -->
+    <label>Bearer Token (from /auth/login):<br>
+        <input id="jwt" type="text" placeholder="eyJhbGci..." style="width:100%;box-sizing:border-box">
+    </label>
+
+    <br><br>
+    <input type="file" id="file" accept="image/*">
+    <button id="upload-btn">Upload Avatar</button>
+
+    <div id="status">Waiting…</div>
+    <pre id="output"></pre>
+
+<script>
+const API_BASE = 'http://localhost:3000';
+
+document.getElementById('upload-btn').addEventListener('click', async () => {
+    const fileInput = document.getElementById('file');
+    const jwt       = document.getElementById('jwt').value.trim();
+    const status    = document.getElementById('status');
+    const output    = document.getElementById('output');
+
+    if (!jwt)               return alert('Paste your Bearer token first.');
+    if (!fileInput.files[0]) return alert('Select a file first.');
+
+    status.textContent = '1/3  Fetching fresh signed params from server…';
+    output.textContent = '';
+
+    // ── Step 1: get fresh signature + timestamp from your NestJS backend ──
+    let params;
+    try {
+        const res = await fetch(`${API_BASE}/users/me/avatar/upload-url`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${jwt}` },
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(`${res.status} – ${JSON.stringify(err)}`);
+        }
+        params = await res.json();
+        output.textContent = 'Signed params:\n' + JSON.stringify(params, null, 2);
+    } catch (err) {
+        status.textContent = '❌ Failed to fetch signed params';
+        output.textContent = String(err);
+        return;
+    }
+
+    status.textContent = '2/3  Uploading to Cloudinary…';
+
+    // ── Step 2: build FormData using ONLY the fields that were signed ──
+    // Signed fields: public_id, overwrite, invalidate, timestamp  (+ signature + api_key)
+    // Do NOT add extra fields (e.g. notification_url, folder) — they weren't signed and
+    // Cloudinary will reject the signature if you include unsigned fields.
+    const formData = new FormData();
+    formData.append('file',       fileInput.files[0]);
+    formData.append('api_key',    params.data.apiKey);
+    formData.append('timestamp',  params.data.timestamp);
+    formData.append('signature',  params.data.signature);
+    formData.append('public_id',  params.data.publicId);
+    formData.append('overwrite',  'true');
+    formData.append('invalidate', 'true');
+
+    // ── Step 3: POST directly to Cloudinary ──
+    try {
+        const res  = await fetch(params.data.uploadUrl, { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (!res.ok) {
+            status.textContent = `❌ Cloudinary error (${res.status})`;
+        } else {
+            status.textContent = '✅ Upload successful!';
+        }
+        output.textContent = JSON.stringify(data, null, 2);
+    } catch (err) {
+        status.textContent = '❌ Upload failed';
+        output.textContent = String(err);
+    }
+});
+</script>
+</body>
+</html>

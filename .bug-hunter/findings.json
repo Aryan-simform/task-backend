@@ -1,0 +1,240 @@
+{
+    "version": "3.0.0",
+    "scan_id": "scan-2026-07-10-173000",
+    "scan_date": "2026-07-10T11:42:00Z",
+    "mode": "small",
+    "target": "src/",
+    "files_scanned": 42,
+    "threat_model_loaded": false,
+    "confirmed": [
+        {
+            "id": "BUG-1",
+            "severity": "CRITICAL",
+            "category": "runtime-crash",
+            "stride": "N/A",
+            "cwe": "N/A",
+            "file": "src/modules/auth/repositories/refresh-token.repository.ts",
+            "lines": "3",
+            "claim": "Imports from `typeorm/browser` instead of `typeorm` — this is the browser bundle and cannot use Node.js pg drivers; app crashes on startup",
+            "fix_applied": true
+        },
+        {
+            "id": "BUG-2",
+            "severity": "CRITICAL",
+            "category": "dependency",
+            "stride": "N/A",
+            "cwe": "N/A",
+            "file": "package.json",
+            "lines": "55",
+            "claim": "`typeorm` version pinned to `^1.0.0` — no such version exists (latest stable is 0.3.x); npm install fails to resolve it",
+            "fix_applied": true
+        },
+        {
+            "id": "BUG-3",
+            "severity": "CRITICAL",
+            "category": "config",
+            "stride": "N/A",
+            "cwe": "N/A",
+            "file": "src/config/database.config.ts",
+            "lines": "4-10",
+            "claim": "Missing `database` field in database config — TypeORM cannot connect to PostgreSQL without a target database name",
+            "fix_applied": true
+        },
+        {
+            "id": "BUG-4",
+            "severity": "HIGH",
+            "category": "config",
+            "stride": "N/A",
+            "cwe": "N/A",
+            "file": "src/database/data-source.ts",
+            "lines": "10",
+            "claim": "Uses `DATABASE_USER` env var but the rest of the app and .env-example use `DATABASE_USERNAME` — migration CLI connects with undefined username",
+            "fix_applied": true
+        },
+        {
+            "id": "BUG-5",
+            "severity": "HIGH",
+            "category": "logic",
+            "stride": "N/A",
+            "cwe": "N/A",
+            "file": "src/modules/user/dto/create-user.dto.ts",
+            "lines": "19,24",
+            "claim": "DTO has `firstname`/`lastname` (all lowercase) but User entity has `firstName`/`lastName` (camelCase) — spread into create() saves undefined for those columns, causing NOT NULL constraint violations",
+            "fix_applied": true
+        },
+        {
+            "id": "BUG-6",
+            "severity": "HIGH",
+            "category": "logic",
+            "stride": "N/A",
+            "cwe": "N/A",
+            "file": "src/modules/auth/dto/login.dto.ts",
+            "lines": "1-13",
+            "claim": "`LoginDto extends PartialType(RegisterDto)` — inherits username/firstName/lastName validators; with `forbidNonWhitelisted: true`, any extra fields from clients throw 400; semantically wrong design",
+            "fix_applied": true
+        },
+        {
+            "id": "BUG-7",
+            "severity": "HIGH",
+            "category": "logic",
+            "stride": "N/A",
+            "cwe": "N/A",
+            "file": "src/modules/user/user.controller.ts",
+            "lines": "8,14",
+            "claim": "`@Controller()` missing route prefix (should be 'users'); `findById` returns null which is sent as HTTP 200 null body instead of throwing 404",
+            "fix_applied": true
+        },
+        {
+            "id": "BUG-8",
+            "severity": "HIGH",
+            "category": "config",
+            "stride": "N/A",
+            "cwe": "N/A",
+            "file": "src/main.ts",
+            "lines": "8-16",
+            "claim": "Swagger config missing `addBearerAuth()` so `@ApiBearerAuth()` decorators have no effect in Swagger UI — cannot test authenticated endpoints. Also `ValidationPipe` was registered AFTER Swagger setup, risking unvalidated requests during document generation.",
+            "fix_applied": true
+        },
+        {
+            "id": "BUG-9",
+            "severity": "MEDIUM",
+            "category": "data-integrity",
+            "stride": "N/A",
+            "cwe": "N/A",
+            "file": "src/modules/auth/entities/refresh-token.entity.ts",
+            "lines": "28-29",
+            "claim": "Redundant `revoked: boolean` column that is never updated (repository only sets `revokedAt`) — always stays `false`, misleads auditors and wastes storage",
+            "fix_applied": true
+        },
+        {
+            "id": "BUG-10",
+            "severity": "MEDIUM",
+            "category": "logic",
+            "stride": "N/A",
+            "cwe": "N/A",
+            "file": "src/modules/auth/repositories/refresh-token.repository.ts",
+            "lines": "17-18",
+            "claim": "`findActiveByUser` doesn't filter `expiresAt > NOW()` — expired but non-revoked tokens are included in active sessions, causing unnecessary argon2 hash comparisons",
+            "fix_applied": true
+        },
+        {
+            "id": "BUG-11",
+            "severity": "MEDIUM",
+            "category": "typo",
+            "stride": "N/A",
+            "cwe": "N/A",
+            "file": "src/modules/user/entities/user.entity.ts",
+            "lines": "32,35",
+            "claim": "`createAt`/`updateAt` are typos — should be `createdAt`/`updatedAt`. Propagates wrong field names to API responses and Swagger docs.",
+            "fix_applied": true
+        },
+        {
+            "id": "BUG-12",
+            "severity": "MEDIUM",
+            "category": "security",
+            "stride": "InfoDisclosure",
+            "cwe": "CWE-321",
+            "file": ".env-example",
+            "lines": "7-9",
+            "claim": "Wrong JWT env var names (`JWT_ACCESS`, `JWT_REFRESH`, `JWT_EXPIRY_TIME`) — a developer copying .env-example gets `undefined` secrets; JWT is then signed with `undefined` as the key, which is a critical security vulnerability",
+            "fix_applied": true
+        },
+        {
+            "id": "BUG-13",
+            "severity": "MEDIUM",
+            "category": "runtime",
+            "stride": "N/A",
+            "cwe": "N/A",
+            "file": "src/app.module.ts",
+            "lines": "15-30",
+            "claim": "`AppController` and `AppService` are defined but not registered in `AppModule` — NestJS cannot inject `AppService` into `AppController`, throwing a DI error at startup",
+            "fix_applied": true
+        },
+        {
+            "id": "BUG-N1",
+            "severity": "CRITICAL",
+            "category": "config",
+            "stride": "N/A",
+            "cwe": "N/A",
+            "file": "src/modules/cloudinary/cloudinary.service.ts",
+            "lines": "38",
+            "claim": "`generateSignedUploadParams` fetches config key `cloudinary.webhookurl` but the config registers it as `cloudinary.notificationUrl`. With `getOrThrow`, this throws on every avatar upload URL request — the entire signed-URL flow is broken.",
+            "fix_applied": true
+        },
+        {
+            "id": "BUG-N2",
+            "severity": "CRITICAL",
+            "category": "config",
+            "stride": "N/A",
+            "cwe": "N/A",
+            "file": "src/config/redis.config.ts",
+            "lines": "5",
+            "claim": "Port is read from `process.env.REDIS_HOST` instead of `process.env.REDIS_PORT`. `parseInt('localhost')` → NaN — BullMQ connects to `host:NaN` and silently fails to process any queue jobs.",
+            "fix_applied": true
+        },
+        {
+            "id": "BUG-N3",
+            "severity": "CRITICAL",
+            "category": "runtime",
+            "stride": "N/A",
+            "cwe": "N/A",
+            "file": "src/app.module.ts",
+            "lines": "29-50",
+            "claim": "`WebhooksModule` (containing the Cloudinary webhook controller + BullMQ queue injection) was never imported into `AppModule`. The `POST /webhooks/cloudinary` route didn't exist — Cloudinary could never trigger BullMQ jobs.",
+            "fix_applied": true
+        },
+        {
+            "id": "BUG-N4",
+            "severity": "HIGH",
+            "category": "naming",
+            "stride": "N/A",
+            "cwe": "N/A",
+            "file": "src/modules/webhooks/webhooks.module.ts",
+            "lines": "10",
+            "claim": "Class exported as `webhooksModule` (lowercase 'w') — violates NestJS PascalCase convention, causes misleading DI debug messages, and mismatches the import in app.module.ts which now uses `WebhooksModule`.",
+            "fix_applied": true
+        },
+        {
+            "id": "BUG-N5",
+            "severity": "MEDIUM",
+            "category": "logic",
+            "stride": "N/A",
+            "cwe": "N/A",
+            "file": "src/modules/media-queue/processors/media.processor.ts",
+            "lines": "33",
+            "claim": "`publicId.split('/')[1]` has no validation — if `publicId` is malformed (no slash or empty segment), `userId` is `undefined` or `''`, causing TypeORM to update the wrong row or crash the processor silently.",
+            "fix_applied": true
+        },
+        {
+            "id": "BUG-N6",
+            "severity": "LOW",
+            "category": "dead-code",
+            "stride": "N/A",
+            "cwe": "N/A",
+            "file": "src/app.module.ts",
+            "lines": "19",
+            "claim": "Unused `import { config } from 'process'` — dead import that shadows the `config: ConfigService` parameter name in `BullModule.forRootAsync` useFactory, potentially causing confusion.",
+            "fix_applied": true
+        }
+    ],
+    "dismissed": [],
+    "dependencies": [],
+    "summary": {
+        "total_reported": 19,
+        "confirmed": 19,
+        "dismissed": 0,
+        "by_severity": { "CRITICAL": 6, "HIGH": 6, "MEDIUM": 6, "LOW": 1 },
+        "by_category": {
+            "runtime-crash": 1,
+            "dependency": 1,
+            "config": 5,
+            "logic": 5,
+            "data-integrity": 1,
+            "typo": 1,
+            "security": 1,
+            "runtime": 2,
+            "naming": 1,
+            "dead-code": 1
+        }
+    }
+}

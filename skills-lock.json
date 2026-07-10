@@ -1,0 +1,11 @@
+{
+    "version": 1,
+    "skills": {
+        "bug-hunter": {
+            "source": "codexstar69/bug-hunter",
+            "sourceType": "github",
+            "skillPath": "SKILL.md",
+            "computedHash": "f864f5453fc7a2ca0509e8b090e4c48dac13a54783773c5db8973ae9c9574077"
+        }
+    }
+}

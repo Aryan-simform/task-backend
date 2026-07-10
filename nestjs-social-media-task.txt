@@ -1,0 +1,108 @@
+NESTJS LEARNING PROJECT: SOCIAL MEDIA BACKEND
+================================================
+
+A self-guided build to learn NestJS deeply by building an Instagram-style
+backend. Each section below is something you implement and understand,
+not just tick off.
+
+
+CORE FEATURES (MUST-HAVE)
+--------------------------
+
+1. POSTS (Text, Image, Video)
+   - Post entity/schema supporting multiple content types - decide between
+     a discriminator field (type: 'text' | 'image' | 'video') vs. separate
+     related tables for media metadata, and understand the tradeoff.
+   - Cursor-based pagination for feeds (learn why offset pagination falls
+     apart on a live, growing feed).
+   - DTOs + class-validator/class-transformer for upload validation.
+
+2. LIKES
+   - Unique constraint at the DB level so a user can't like a post twice -
+     not just app-level logic.
+   - Denormalized like counters vs. live COUNT() queries - implement one,
+     understand why the other exists.
+   - Idempotent like/unlike endpoints.
+
+3. COMMENTS
+   - Comment entity tied to posts, with support for nested replies - try
+     an adjacency list first (parent_id), then read about materialized
+     path/nested sets to understand why deep threads get expensive.
+   - Pagination on comments (a popular post can have thousands).
+   - Soft-deletable, respecting the same delete pattern as posts (see below).
+
+4. ACCOUNT PRIVACY
+   - Public vs private account types.
+   - Private accounts' content only visible to accepted followers - enforce
+     this in Guards, not scattered if-checks in controllers.
+   - This is a good place to really learn how Guards + Interceptors compose.
+
+5. FOLLOWERS/FOLLOWING
+   - Self-referential many-to-many via a Follow join entity (followerId,
+     followingId, status: pending/accepted).
+   - Endpoints: follow, unfollow, accept/reject, list with pagination.
+
+6. INSTAGRAM-STYLE UPLOAD HANDLING
+   - Pre-signed URLs (S3 or equivalent) so large files go direct-to-storage,
+     not through your NestJS server.
+   - Async pipeline: client gets upload URL -> uploads directly -> notifies
+     backend -> backend queues a job (BullMQ) for transcoding/thumbnails/
+     compression.
+   - Multiple resolution variants, like Instagram's responsive image delivery.
+   - Post status lifecycle: uploading -> processing -> ready -> failed.
+
+7. SOFT DELETES
+   - Apply to posts, comments, and likes - learn a global soft-delete
+     pattern (TypeORM's @DeleteDateColumn or a manual deletedAt + query
+     scoping).
+   - Understand why this matters for audit trails, undo windows, and
+     referential integrity (a "deleted" post's comments shouldn't just
+     vanish).
+
+8. CACHING
+   - Redis-backed caching for hot reads: follower counts, feed pages, post
+     like counts.
+   - Use NestJS's CacheModule / CacheInterceptor, and manually invalidate
+     cache on writes (this is the part everyone gets wrong first - learn
+     cache invalidation on a like/unlike or follow/unfollow).
+
+9. API VERSIONING
+   - Use NestJS's built-in versioning (URI, header, or media-type strategy)
+     - pick one and understand why the others exist.
+   - Structure at least one endpoint with a v1/v2 distinction to see it in
+     practice, even if v2 barely differs.
+
+10. SWAGGER / OPENAPI DOCS
+    - @nestjs/swagger wired up across all modules with proper DTO decorators
+      (@ApiProperty, etc.).
+    - Treat this as a forcing function for clean DTOs - if it's annoying to
+      document, your DTO design probably needs work.
+
+
+GOOD-TO-HAVE / STRETCH FEATURES
+---------------------------------
+
+   - Feed generation - fan-out-on-write vs. fan-out-on-read for the home feed
+   - Notifications module via BullMQ + Redis (likes, comments, follows)
+   - Rate limiting (ThrottlerModule) on posts/likes/comments to prevent spam
+   - Hashtag/full-text search (Postgres tsvector or Elasticsearch)
+   - Block/mute, distinct from account privacy
+   - Content moderation stub - an endpoint/service where an external
+     moderation API could plug in
+   - Testing: unit tests for services/guards, e2e tests for auth and
+     privacy enforcement
+   - WebSocket/SSE for real-time notifications or upload-status updates
+
+
+ARCHITECTURAL PRINCIPLES TO PRACTICE
+---------------------------------------
+
+   - Clear module boundaries: AuthModule, UsersModule, PostsModule,
+     CommentsModule, FollowModule, MediaModule, NotificationsModule
+   - DTOs + class-validator on every input surface
+   - Guards for auth/privacy, Interceptors for caching/response shaping,
+     Pipes for validation
+   - Pick and be able to justify: TypeORM vs. Prisma, Postgres vs. a
+     document store
+   - Background jobs (media processing, cache warming, notifications) go
+     through a queue - never block the request thread
