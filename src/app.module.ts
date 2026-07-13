@@ -17,6 +17,8 @@ import redisConfig from './config/redis.config';
 import cloudinaryConfig from './config/cloudinary.config';
 import { BullModule } from '@nestjs/bullmq';
 import { WebhooksModule } from 'src/modules/webhooks/webhooks.module';
+import { FollowModule } from './modules/follow/follow.module';
+import { PostModule } from './modules/post/post.module';
 @Module({
     controllers: [AppController],
     providers: [
@@ -48,6 +50,8 @@ import { WebhooksModule } from 'src/modules/webhooks/webhooks.module';
         UserModule,
         AuthModule,
         WebhooksModule,
+        FollowModule,
+        PostModule,
     ],
 })
 export class AppModule {

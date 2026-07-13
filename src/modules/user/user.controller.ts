@@ -16,7 +16,7 @@ import type { User } from './entities/user.entity';
 import { SetPrivateDto } from './dto/set-private.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { checkPrivacy } from 'src/common/decorators/check-privacy.decorator';
-import { PrivacyGuard } from 'src/common/guards/privacy.guard.ts.guard';
+import { PrivacyGuard } from 'src/common/guards/privacy.guard';
 
 @ApiTags('users')
 @ApiBearerAuth()

@@ -10,6 +10,7 @@ import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { CHECK_PRIVACY_KEY } from '../decorators/check-privacy.decorator';
 import { UserService } from '../../modules/user/user.service';
+import { FollowService } from 'src/modules/follow/follow.service';
 
 interface AuthenticatedRequest extends Request {
     params: Record<string, string>;
@@ -21,6 +22,7 @@ export class PrivacyGuard implements CanActivate {
     constructor(
         private readonly reflector: Reflector,
         private readonly userService: UserService,
+        private readonly followService: FollowService,
     ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -42,9 +44,13 @@ export class PrivacyGuard implements CanActivate {
         if (!targetUser.isPrivate) return true; // public account
         if (targetUser.id === requesterId) return true; // viewing your own account
 
-        // TODO once FollowModule exists (Phase 5):
-        // const isFollower = await this.followService.isAcceptedFollower(requesterId, targetUserId);
-        // if (isFollower) return true;
+        if (!requesterId)
+            throw new ForbiddenException('this account is private');
+        const isFollower = await this.followService.isAcceptedFollower(
+            requesterId,
+            targetUser.id,
+        );
+        if (isFollower) return true;
 
         throw new ForbiddenException('this account is private');
     }
