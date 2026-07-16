@@ -7,7 +7,7 @@ import {
     forwardRef,
 } from '@nestjs/common';
 import { FollowRepository } from './repositories/follow.repository';
-import { Follow, FollowStatus } from './entities/follow.entitiy';
+import { Follow, FollowStatus } from './entities/follow.entity';
 import { UserService } from '../user/user.service';
 import { FollowCursor } from './interfaces/followCursor.interface';
 import { FeedQueryDto } from '../post/dto/feed-query.dto';

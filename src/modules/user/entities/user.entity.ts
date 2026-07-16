@@ -29,10 +29,10 @@ export class User {
     password!: string;
 
     @Column({ nullable: true })
-    bio!: string;
+    bio?: string;
 
     @Column({ nullable: true })
-    avatarUrl!: string;
+    avatarUrl?: string;
 
     @Column({ default: false })
     isPrivate!: boolean;

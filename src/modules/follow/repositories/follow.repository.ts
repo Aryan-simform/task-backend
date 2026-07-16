@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
-import { Follow, FollowStatus } from '../entities/follow.entitiy';
+import { Follow, FollowStatus } from '../entities/follow.entity';
 import { FollowCursor } from '../interfaces/followCursor.interface';
 
 @Injectable()

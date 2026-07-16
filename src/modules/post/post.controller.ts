@@ -14,6 +14,7 @@ import { Post } from './entities/post.entity';
 import { CreatePostDto } from './dto/create-post.dto';
 import { FeedQueryDto } from './dto/feed-query.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequestMediaUploadDto } from './dto/request-media-upload.dto';
 
 @ApiTags('posts')
 @ApiBearerAuth()
@@ -45,5 +46,40 @@ export class PostController {
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<void> {
         return this.postService.remove(userId, id);
+    }
+
+    @HttpPost(':postId/media/upload-url')
+    async requestMediaUpload(
+        @CurrentUser('sub') userId: string,
+        @Param('postId', ParseUUIDPipe) postId: string,
+        @Body() dto: RequestMediaUploadDto,
+    ): Promise<{
+        uploadUrl: string;
+        signature: string;
+        timestamp: number;
+        apiKey: string;
+        cloudName: string;
+        mediaId: string;
+        publicId: string;
+        folder: string;
+        notificationUrl: string;
+    }> {
+        return this.postService.requestMediaUpload(userId, postId, dto);
+    }
+
+    @HttpPost(':id/like')
+    async like(
+        @CurrentUser('sub') userId: string,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<void> {
+        return this.postService.like(userId, id);
+    }
+
+    @Delete(':id/like')
+    async unlike(
+        @CurrentUser('sub') userId: string,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<void> {
+        return this.postService.unlike(userId, id);
     }
 }

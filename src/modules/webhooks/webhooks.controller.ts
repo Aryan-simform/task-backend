@@ -4,8 +4,8 @@ import { Request } from 'express';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
-import { Public } from 'src/common/decorators/public.decorator';
-import { MEDIA_QUEUE } from '../media-queue/media-queue.module';
+import { Public } from '../../common/decorators/public.decorator';
+import { MEDIA_QUEUE } from '../media-queue/media-queue.constants';
 
 @Controller('webhooks')
 export class WebhooksController {
@@ -34,12 +34,18 @@ export class WebhooksController {
             notification_type: string;
             public_id: string;
             secure_url: string;
+            resource_type: 'image' | 'video';
         };
 
         if (payload.notification_type === 'upload') {
-            await this.mediaQueue.add('avatar-uploaded', {
+            const jobName = payload.public_id.startsWith('avatars/')
+                ? 'avatar-uploaded'
+                : 'post-media-uploaded';
+
+            await this.mediaQueue.add(jobName, {
                 publicId: payload.public_id,
                 secureUrl: payload.secure_url,
+                resourceType: payload.resource_type,
             });
         }
         return { received: true };

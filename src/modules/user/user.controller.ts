@@ -11,12 +11,12 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
-import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { User } from './entities/user.entity';
 import { SetPrivateDto } from './dto/set-private.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { checkPrivacy } from 'src/common/decorators/check-privacy.decorator';
-import { PrivacyGuard } from 'src/common/guards/privacy.guard';
+import { checkPrivacy } from '../../common/decorators/check-privacy.decorator';
+import { PrivacyGuard } from '../../common/guards/privacy.guard';
 
 @ApiTags('users')
 @ApiBearerAuth()

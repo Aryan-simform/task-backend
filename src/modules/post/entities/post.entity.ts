@@ -6,6 +6,7 @@ import {
     OneToMany,
     CreateDateColumn,
     UpdateDateColumn,
+    JoinColumn,
 } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
 import { PostMedia } from './post-media.entity';
@@ -23,6 +24,7 @@ export class Post {
     id: string;
 
     @ManyToOne(() => User, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'authorId' })
     author: User;
 
     @Column()
@@ -41,6 +43,9 @@ export class Post {
         eager: false,
     })
     media: PostMedia[];
+
+    @Column({ default: 0 })
+    likesCount: number;
 
     @CreateDateColumn()
     createdAt: Date;

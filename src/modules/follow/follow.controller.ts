@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { FollowService, FollowPage } from './follow.service';
-import { Follow } from './entities/follow.entitiy';
+import { Follow } from './entities/follow.entity';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { FeedQueryDto } from '../post/dto/feed-query.dto';
 

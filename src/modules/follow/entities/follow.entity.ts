@@ -3,13 +3,14 @@ import {
     PrimaryGeneratedColumn,
     Column,
     ManyToOne,
+    JoinColumn,
     CreateDateColumn,
     UpdateDateColumn,
     Unique,
     Check,
 } from 'typeorm';
 
-import { User } from 'src/modules/user/entities/user.entity';
+import { User } from '../../user/entities/user.entity';
 
 export enum FollowStatus {
     PENDING = 'pending',
@@ -18,22 +19,24 @@ export enum FollowStatus {
 
 @Entity('follows')
 @Unique(['followerId', 'followingId'])
-@Check('following <>followingId')
+@Check(`"followerId" <> "followingId"`)
 export class Follow {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
+    @Column()
+    followerId: string;
+
     @ManyToOne(() => User, { onDelete: 'CASCADE' })
-    following: User;
+    @JoinColumn({ name: 'followerId' })
+    follower: User;
 
     @Column()
     followingId: string;
 
     @ManyToOne(() => User, { onDelete: 'CASCADE' })
-    follower: User;
-
-    @Column()
-    followerId: string;
+    @JoinColumn({ name: 'followingId' })
+    following: User;
 
     @Column({ type: 'enum', enum: FollowStatus })
     status: FollowStatus;

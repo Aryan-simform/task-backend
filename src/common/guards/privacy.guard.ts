@@ -10,7 +10,7 @@ import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { CHECK_PRIVACY_KEY } from '../decorators/check-privacy.decorator';
 import { UserService } from '../../modules/user/user.service';
-import { FollowService } from 'src/modules/follow/follow.service';
+import { FollowService } from '../../modules/follow/follow.service';
 
 interface AuthenticatedRequest extends Request {
     params: Record<string, string>;

@@ -1,96 +1,400 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Avatar Upload Test</title>
-    <style>
-        body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; }
-        pre  { background: #f4f4f4; padding: 12px; border-radius: 6px; overflow: auto; white-space: pre-wrap; }
-        button { margin-top: 12px; padding: 8px 16px; cursor: pointer; }
-        #status { margin-top: 16px; color: #555; }
-    </style>
-</head>
-<body>
-    <h2>Cloudinary Pre-signed Upload Test</h2>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Upload Test Dashboard</title>
+        <style>
+            body {
+                font-family: sans-serif;
+                max-width: 700px;
+                margin: 40px auto;
+                padding: 0 20px;
+            }
+            section {
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                padding: 16px;
+                margin-bottom: 24px;
+            }
+            h2 {
+                margin-top: 0;
+                font-size: 18px;
+            }
+            pre {
+                background: #f4f4f4;
+                padding: 12px;
+                border-radius: 6px;
+                overflow: auto;
+                white-space: pre-wrap;
+                font-size: 12px;
+            }
+            button {
+                margin-top: 10px;
+                padding: 8px 16px;
+                cursor: pointer;
+            }
+            input,
+            select {
+                width: 100%;
+                box-sizing: border-box;
+                padding: 6px;
+                margin-top: 4px;
+            }
+            label {
+                display: block;
+                margin-top: 10px;
+                font-size: 13px;
+                color: #333;
+            }
+            .status {
+                margin-top: 10px;
+                font-weight: bold;
+                color: #555;
+            }
+            .row {
+                display: flex;
+                gap: 12px;
+            }
+            .row > div {
+                flex: 1;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Upload Test Dashboard</h1>
 
-    <!-- Step 1: paste a valid JWT from /auth/login -->
-    <label>Bearer Token (from /auth/login):<br>
-        <input id="jwt" type="text" placeholder="eyJhbGci..." style="width:100%;box-sizing:border-box">
-    </label>
+        <!-- Shared JWT, used by every section below -->
+        <section>
+            <h2>0. Bearer Token</h2>
+            <label
+                >JWT (from POST /auth/login response):
+                <input id="jwt" type="text" placeholder="eyJhbGci..." />
+            </label>
+        </section>
 
-    <br><br>
-    <input type="file" id="file" accept="image/*">
-    <button id="upload-btn">Upload Avatar</button>
+        <!-- ============ AVATAR ============ -->
+        <section>
+            <h2>1. Avatar Upload</h2>
+            <input type="file" id="avatar-file" accept="image/*" />
+            <button id="avatar-btn">Upload Avatar</button>
+            <div class="status" id="avatar-status">Waiting…</div>
+            <pre id="avatar-output"></pre>
+        </section>
 
-    <div id="status">Waiting…</div>
-    <pre id="output"></pre>
+        <!-- ============ CREATE POST ============ -->
+        <section>
+            <h2>2. Create Post</h2>
+            <label
+                >Caption:
+                <input
+                    id="post-caption"
+                    type="text"
+                    placeholder="A carousel from the trip"
+                />
+            </label>
+            <label
+                >Media count (0 for text-only post):
+                <input
+                    id="post-media-count"
+                    type="number"
+                    value="1"
+                    min="0"
+                    max="10"
+                />
+            </label>
+            <button id="post-btn">Create Post</button>
+            <div class="status" id="post-status">Waiting…</div>
+            <pre id="post-output"></pre>
+            <p style="font-size: 12px; color: #777">
+                Copy the returned <code>id</code> into the Post ID field below
+                once created.
+            </p>
+        </section>
 
-<script>
-const API_BASE = 'http://localhost:3000';
+        <!-- ============ MEDIA UPLOAD ============ -->
+        <section>
+            <h2>3. Upload Media to a Post</h2>
+            <label
+                >Post ID:
+                <input
+                    id="media-post-id"
+                    type="text"
+                    placeholder="paste the post id from step 2"
+                />
+            </label>
+            <div class="row">
+                <div>
+                    <label
+                        >Type:
+                        <select id="media-type">
+                            <option value="image">image</option>
+                            <option value="video">video</option>
+                        </select>
+                    </label>
+                </div>
+                <div>
+                    <label
+                        >Position (0-indexed, for carousels):
+                        <input
+                            id="media-position"
+                            type="number"
+                            value="0"
+                            min="0"
+                        />
+                    </label>
+                </div>
+            </div>
+            <label
+                >File:
+                <input type="file" id="media-file" accept="image/*,video/*" />
+            </label>
+            <button id="media-btn">Upload Media</button>
+            <div class="status" id="media-status">Waiting…</div>
+            <pre id="media-output"></pre>
+        </section>
 
-document.getElementById('upload-btn').addEventListener('click', async () => {
-    const fileInput = document.getElementById('file');
-    const jwt       = document.getElementById('jwt').value.trim();
-    const status    = document.getElementById('status');
-    const output    = document.getElementById('output');
+        <!-- ============ CHECK STATUS ============ -->
+        <section>
+            <h2>4. Check Post Status</h2>
+            <p style="font-size: 12px; color: #777">
+                Webhook → BullMQ processing isn't instant. Poll this a few times
+                after uploading to watch status flip from
+                <code>uploading</code> → <code>ready</code>.
+            </p>
+            <label
+                >Post ID:
+                <input
+                    id="check-post-id"
+                    type="text"
+                    placeholder="paste the post id"
+                />
+            </label>
+            <button id="check-btn">Refresh Status</button>
+            <pre id="check-output"></pre>
+        </section>
 
-    if (!jwt)               return alert('Paste your Bearer token first.');
-    if (!fileInput.files[0]) return alert('Select a file first.');
+        <script>
+            const API_BASE = 'http://localhost:3000';
 
-    status.textContent = '1/3  Fetching fresh signed params from server…';
-    output.textContent = '';
+            function getJwt() {
+                const jwt = document.getElementById('jwt').value.trim();
+                if (!jwt) alert('Paste your Bearer token in section 0 first.');
+                return jwt;
+            }
 
-    // ── Step 1: get fresh signature + timestamp from your NestJS backend ──
-    let params;
-    try {
-        const res = await fetch(`${API_BASE}/users/me/avatar/upload-url`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${jwt}` },
-        });
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(`${res.status} – ${JSON.stringify(err)}`);
-        }
-        params = await res.json();
-        output.textContent = 'Signed params:\n' + JSON.stringify(params, null, 2);
-    } catch (err) {
-        status.textContent = '❌ Failed to fetch signed params';
-        output.textContent = String(err);
-        return;
-    }
+            // Generic: request signed params from backend, then POST the file straight to Cloudinary.
+            // signedFields = the exact keys (besides api_key/timestamp/signature/file) that the
+            // backend included when it called generateSignedUploadParams(...) — must match exactly.
+            async function uploadToCloudinary(
+                signedParams,
+                file,
+                extraFormFields,
+                statusEl,
+                outputEl,
+            ) {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('api_key', signedParams.apiKey);
+                formData.append('timestamp', signedParams.timestamp);
+                formData.append('signature', signedParams.signature);
+                for (const [key, value] of Object.entries(extraFormFields)) {
+                    formData.append(key, value);
+                }
 
-    status.textContent = '2/3  Uploading to Cloudinary…';
+                statusEl.textContent = 'Uploading to Cloudinary…';
+                const res = await fetch(signedParams.uploadUrl, {
+                    method: 'POST',
+                    body: formData,
+                });
+                const data = await res.json();
 
-    // ── Step 2: build FormData using ONLY the fields that were signed ──
-    // Signed fields: public_id, overwrite, invalidate, timestamp  (+ signature + api_key)
-    // Do NOT add extra fields (e.g. notification_url, folder) — they weren't signed and
-    // Cloudinary will reject the signature if you include unsigned fields.
-    const formData = new FormData();
-    formData.append('file',       fileInput.files[0]);
-    formData.append('api_key',    params.data.apiKey);
-    formData.append('timestamp',  params.data.timestamp);
-    formData.append('signature',  params.data.signature);
-    formData.append('public_id',  params.data.publicId);
-    formData.append('overwrite',  'true');
-    formData.append('invalidate', 'true');
+                if (!res.ok) {
+                    statusEl.textContent = `❌ Cloudinary error (${res.status})`;
+                } else {
+                    statusEl.textContent =
+                        '✅ Upload sent — waiting on webhook to process it.';
+                }
+                outputEl.textContent = JSON.stringify(data, null, 2);
+                return res.ok;
+            }
 
-    // ── Step 3: POST directly to Cloudinary ──
-    try {
-        const res  = await fetch(params.data.uploadUrl, { method: 'POST', body: formData });
-        const data = await res.json();
+            // ── 1. Avatar ──
+            document
+                .getElementById('avatar-btn')
+                .addEventListener('click', async () => {
+                    const jwt = getJwt();
+                    if (!jwt) return;
+                    const file =
+                        document.getElementById('avatar-file').files[0];
+                    const status = document.getElementById('avatar-status');
+                    const output = document.getElementById('avatar-output');
+                    if (!file) return alert('Select a file first.');
 
-        if (!res.ok) {
-            status.textContent = `❌ Cloudinary error (${res.status})`;
-        } else {
-            status.textContent = '✅ Upload successful!';
-        }
-        output.textContent = JSON.stringify(data, null, 2);
-    } catch (err) {
-        status.textContent = '❌ Upload failed';
-        output.textContent = String(err);
-    }
-});
-</script>
-</body>
+                    status.textContent = 'Fetching signed params…';
+                    try {
+                        const res = await fetch(
+                            `${API_BASE}/users/me/avatar/upload-url`,
+                            {
+                                method: 'POST',
+                                headers: { Authorization: `Bearer ${jwt}` },
+                            },
+                        );
+                        if (!res.ok)
+                            throw new Error(
+                                `${res.status} – ${JSON.stringify(await res.json().catch(() => ({})))}`,
+                            );
+                        const body = await res.json();
+                        const params = body.data ?? body; // handles both { data: {...} } and flat responses
+
+                        // NOTE: adjust these fields to match whatever CloudinaryService.generateSignedUploadParams
+                        // actually signs for avatars in your current backend code.
+                        await uploadToCloudinary(
+                            params,
+                            file,
+                            {
+                                public_id: params.publicId,
+                                overwrite: 'true',
+                                invalidate: 'true',
+                            },
+                            status,
+                            output,
+                        );
+                    } catch (err) {
+                        status.textContent = '❌ Failed';
+                        output.textContent = String(err);
+                    }
+                });
+
+            // ── 2. Create Post ──
+            document
+                .getElementById('post-btn')
+                .addEventListener('click', async () => {
+                    const jwt = getJwt();
+                    if (!jwt) return;
+                    const status = document.getElementById('post-status');
+                    const output = document.getElementById('post-output');
+                    const caption =
+                        document.getElementById('post-caption').value;
+                    const mediaCount = Number(
+                        document.getElementById('post-media-count').value,
+                    );
+
+                    status.textContent = 'Creating post…';
+                    try {
+                        const res = await fetch(`${API_BASE}/posts`, {
+                            method: 'POST',
+                            headers: {
+                                Authorization: `Bearer ${jwt}`,
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ caption, mediaCount }),
+                        });
+                        const data = await res.json();
+                        status.textContent = res.ok
+                            ? '✅ Post created'
+                            : `❌ ${res.status}`;
+                        output.textContent = JSON.stringify(data, null, 2);
+                        // auto-fill the post id into the next two sections for convenience
+                        const postId = data.data?.id ?? data.id;
+                        if (postId) {
+                            document.getElementById('media-post-id').value =
+                                postId;
+                            document.getElementById('check-post-id').value =
+                                postId;
+                        }
+                    } catch (err) {
+                        status.textContent = '❌ Failed';
+                        output.textContent = String(err);
+                    }
+                });
+
+            // ── 3. Upload Media ──
+            document
+                .getElementById('media-btn')
+                .addEventListener('click', async () => {
+                    const jwt = getJwt();
+                    if (!jwt) return;
+                    const status = document.getElementById('media-status');
+                    const output = document.getElementById('media-output');
+                    const postId = document
+                        .getElementById('media-post-id')
+                        .value.trim();
+                    const type = document.getElementById('media-type').value;
+                    const position = Number(
+                        document.getElementById('media-position').value,
+                    );
+                    const file = document.getElementById('media-file').files[0];
+
+                    if (!postId)
+                        return alert(
+                            'Paste a post id first (create one in step 2).',
+                        );
+                    if (!file) return alert('Select a file first.');
+
+                    status.textContent = 'Fetching signed params…';
+                    try {
+                        const res = await fetch(
+                            `${API_BASE}/posts/${postId}/media/upload-url`,
+                            {
+                                method: 'POST',
+                                headers: {
+                                    Authorization: `Bearer ${jwt}`,
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ type, position }),
+                            },
+                        );
+                        if (!res.ok)
+                            throw new Error(
+                                `${res.status} – ${JSON.stringify(await res.json().catch(() => ({})))}`,
+                            );
+                        const body = await res.json();
+                        const params = body.data ?? body;
+
+                        // NOTE: match these to whatever PostService.requestMediaUpload actually signs.
+                        // As last written together, that was { public_id, folder, notification_url } —
+                        // no overwrite/invalidate (each media item is a new object, never overwritten).
+                        await uploadToCloudinary(
+                            params,
+                            file,
+                            {
+                                public_id: params.mediaId,     // just the id now, not params.publicId
+                                folder: params.folder,
+                                notification_url: params.notificationUrl,
+                            },
+                            status,
+                            output,
+                        );
+                    } catch (err) {
+                        status.textContent = '❌ Failed';
+                        output.textContent = String(err);
+                    }
+                });
+
+            // ── 4. Check Status ──
+            document
+                .getElementById('check-btn')
+                .addEventListener('click', async () => {
+                    const jwt = getJwt();
+                    if (!jwt) return;
+                    const output = document.getElementById('check-output');
+                    const postId = document
+                        .getElementById('check-post-id')
+                        .value.trim();
+                    if (!postId) return alert('Paste a post id first.');
+
+                    try {
+                        const res = await fetch(`${API_BASE}/posts/${postId}`, {
+                            headers: { Authorization: `Bearer ${jwt}` },
+                        });
+                        const data = await res.json();
+                        output.textContent = JSON.stringify(data, null, 2);
+                    } catch (err) {
+                        output.textContent = String(err);
+                    }
+                });
+        </script>
+    </body>
 </html>
+

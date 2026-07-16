@@ -7,8 +7,22 @@ import {
 import { PostRepository, FeedCursor } from './repositories/post.repository';
 import { CreatePostDto } from './dto/create-post.dto';
 import { FeedQueryDto } from './dto/feed-query.dto';
-import { Post } from './entities/post.entity';
-
+import { Post, PostStatus } from './entities/post.entity';
+import { ConfigService } from '@nestjs/config';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { RequestMediaUploadDto } from './dto/request-media-upload.dto';
+import {
+    MediaStatus,
+    MediaType,
+    PostMedia,
+} from './entities/post-media.entity';
+import { PostLike } from './entities/post-like.entity';
+import { DatabaseService } from '../../database/database.service';
+import {
+    getPgErrorCode,
+    PG_FOREIGN_KEY_VIOLATION,
+    PG_UNIQUE_VIOLATION,
+} from '../../common/utils/postgres-error.util';
 export interface FeedPage {
     data: Post[];
     nextCursor: string | null;
@@ -16,10 +30,19 @@ export interface FeedPage {
 
 @Injectable()
 export class PostService {
-    constructor(private readonly postRepo: PostRepository) {}
+    constructor(
+        private readonly postRepo: PostRepository,
+        private readonly cloudinaryService: CloudinaryService,
+        private readonly configService: ConfigService,
+        private readonly databaseService: DatabaseService,
+    ) {}
 
     async create(authorId: string, dto: CreatePostDto): Promise<Post> {
-        return this.postRepo.create({ authorId, caption: dto.caption });
+        const status =
+            dto.mediaCount && dto.mediaCount > 0
+                ? PostStatus.UPLOADING
+                : PostStatus.READY;
+        return this.postRepo.create({ authorId, caption: dto.caption, status });
     }
 
     async findById(id: string): Promise<Post> {
@@ -86,5 +109,92 @@ export class PostService {
             data,
             nextCursor,
         };
+    }
+
+    async requestMediaUpload(
+        userId: string,
+        postId: string,
+        dto: RequestMediaUploadDto,
+    ): Promise<{
+        uploadUrl: string;
+        signature: string;
+        timestamp: number;
+        apiKey: string;
+        cloudName: string;
+        mediaId: string;
+        publicId: string;
+        folder: string;
+        notificationUrl: string;
+    }> {
+        const post = await this.findById(postId);
+
+        if (post.authorId !== userId)
+            throw new ForbiddenException('you have no right of this post');
+
+        const media = await this.postRepo.createMedia({
+            postId,
+            type: dto.type,
+            position: dto.position,
+            status: MediaStatus.UPLOADING,
+        });
+        const notificationUrl = this.configService.getOrThrow<string>(
+            'cloudinary.notificationUrl',
+        );
+        const resourceType: 'image' | 'video' =
+            dto.type === MediaType.VIDEO ? 'video' : 'image';
+        const folder = `posts/${postId}`;
+
+        const signed = this.cloudinaryService.generateSignedUploadParams({
+            public_id: media.id, // just the id — folder supplies the path prefix
+            folder,
+            notification_url: notificationUrl,
+        });
+
+        return {
+            uploadUrl: `https://api.cloudinary.com/v1_1/${signed.cloudName}/${resourceType}/upload`,
+            ...signed,
+            mediaId: media.id,
+            publicId: `${folder}/${media.id}`, // what Cloudinary will actually store — matches what the webhook will send back
+            folder,
+            notificationUrl,
+        };
+    }
+
+    async markMediaReady(mediaId: string, url: string): Promise<void> {
+        await this.postRepo.updateMediaStatus(mediaId, {
+            status: MediaStatus.READY,
+            url,
+        });
+    }
+
+    async getMediaForPost(postId: string): Promise<PostMedia[]> {
+        return this.postRepo.findMediaByPost(postId);
+    }
+
+    async updateStatus(postId: string, status: PostStatus): Promise<void> {
+        await this.postRepo.updateStatus(postId, status);
+    }
+
+    async like(userId: string, postId: string): Promise<void> {
+        await this.databaseService.transaction(async (manager) => {
+            try {
+                await manager.insert(PostLike, { userId, postId });
+            } catch (err) {
+                const code = getPgErrorCode(err);
+                if (code === PG_UNIQUE_VIOLATION) return; // already liked — idempotent, not an error
+                if (code === PG_FOREIGN_KEY_VIOLATION)
+                    throw new NotFoundException('post not found');
+                throw err;
+            }
+            await manager.increment(Post, { id: postId }, 'likesCount', 1);
+        });
+    }
+
+    async unlike(userId: string, postId: string): Promise<void> {
+        await this.databaseService.transaction(async (manager) => {
+            const result = await manager.delete(PostLike, { userId, postId });
+            if (result.affected && result.affected > 0)
+                await manager.decrement(Post, { id: postId }, 'likesCount', 1);
+        });
     }
 }

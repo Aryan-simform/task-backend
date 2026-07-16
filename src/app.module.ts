@@ -2,8 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import databaseConfig from './config/database.config';
 import { DatabaseModule } from './database/database.module';
-import { UserModule } from 'src/modules/user/user.module';
-import { AuthModule } from 'src/modules/auth/auth.module';
+import { UserModule } from './modules/user/user.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ClassSerializerInterceptor, MiddlewareConsumer } from '@nestjs/common';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -16,9 +16,10 @@ import { AppService } from './app.service';
 import redisConfig from './config/redis.config';
 import cloudinaryConfig from './config/cloudinary.config';
 import { BullModule } from '@nestjs/bullmq';
-import { WebhooksModule } from 'src/modules/webhooks/webhooks.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { FollowModule } from './modules/follow/follow.module';
 import { PostModule } from './modules/post/post.module';
+import { CommentModule } from './modules/comment/comment.module';
 @Module({
     controllers: [AppController],
     providers: [
@@ -52,6 +53,7 @@ import { PostModule } from './modules/post/post.module';
         WebhooksModule,
         FollowModule,
         PostModule,
+        CommentModule,
     ],
 })
 export class AppModule {
