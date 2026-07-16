@@ -7,6 +7,7 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
     JoinColumn,
+    DeleteDateColumn,
 } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
 import { PostMedia } from './post-media.entity';
@@ -52,4 +53,7 @@ export class Post {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @DeleteDateColumn({ type: 'timestamptz', nullable: true })
+    deletedAt: Date;
 }

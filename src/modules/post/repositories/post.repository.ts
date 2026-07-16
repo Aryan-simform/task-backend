@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post, PostStatus } from '../entities/post.entity';
 import { PostMedia } from '../entities/post-media.entity';
-
+import { IsNull } from 'typeorm';
 export interface FeedCursor {
     createdAt: Date;
     id: string;
@@ -28,11 +28,26 @@ export class PostRepository {
     }
 
     async findById(id: string): Promise<Post | null> {
+        return this.repo.findOne({
+            where: { id, deletedAt: IsNull() },
+            relations: ['media'],
+        });
+    }
+
+    async findByIdIncludingDeleted(id: string): Promise<Post | null> {
         return this.repo.findOne({ where: { id }, relations: ['media'] });
     }
 
     async delete(id: string): Promise<void> {
         await this.repo.delete(id);
+    }
+
+    async softDelete(id: string): Promise<void> {
+        await this.repo.softDelete(id);
+    }
+
+    async restore(id: string): Promise<void> {
+        await this.repo.restore(id);
     }
 
     async findFeedPage(
@@ -41,7 +56,8 @@ export class PostRepository {
     ): Promise<Post[]> {
         const queryBuilder = this.repo
             .createQueryBuilder('post')
-            .leftJoinAndSelect('post.media', 'media');
+            .leftJoinAndSelect('post.media', 'media')
+            .where('post.deletedAt IS NULL');
         if (cursor) {
             queryBuilder.andWhere(
                 '(post.createdAt,post.id)< (:createdAt,:id)',

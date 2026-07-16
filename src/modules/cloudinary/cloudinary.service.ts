@@ -2,6 +2,12 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
 
+export interface MediaVariants {
+    thumbnail: string;
+    medium: string;
+    full: string;
+}
+
 @Injectable()
 export class CloudinaryService implements OnModuleInit {
     constructor(private readonly configService: ConfigService) {}
@@ -60,5 +66,38 @@ export class CloudinaryService implements OnModuleInit {
             Number(timestamp),
             signature,
         );
+    }
+
+    getImageVariants(url: string): MediaVariants {
+        return {
+            thumbnail: this.insertTransformation(
+                url,
+                'w_150,h_150,c_fill,q_auto,f_auto',
+            ),
+            medium: this.insertTransformation(
+                url,
+                'w_600,c_limit,q_auto,f_auto',
+            ),
+            full: this.insertTransformation(url, 'q_auto,f_auto'),
+        };
+    }
+
+    getVideoPosterVariants(url: string): MediaVariants {
+        const posterUrl = url.replace(/\.(mp4|mov|webm)$/i, '.jpg');
+        return {
+            thumbnail: this.insertTransformation(
+                posterUrl,
+                'so_0,w_150,h_150,c_fill,q_auto',
+            ),
+            medium: this.insertTransformation(
+                posterUrl,
+                'so_0,w_600,c_limit,q_auto',
+            ),
+            full: this.insertTransformation(posterUrl, 'so_0,q_auto'),
+        };
+    }
+
+    private insertTransformation(url: string, tranfromation: string): string {
+        return url.replace('/upload', `/upload/${tranfromation}`);
     }
 }

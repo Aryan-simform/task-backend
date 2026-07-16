@@ -23,9 +23,20 @@ import {
     PG_FOREIGN_KEY_VIOLATION,
     PG_UNIQUE_VIOLATION,
 } from '../../common/utils/postgres-error.util';
+import { MediaVariants } from '../cloudinary/cloudinary.service';
+
 export interface FeedPage {
     data: Post[];
     nextCursor: string | null;
+}
+
+export interface MediaWithVariants extends Omit<PostMedia, 'url'> {
+    url: string | null;
+    variants: MediaVariants | null;
+}
+
+export interface PostWithVariants extends Omit<Post, 'media'> {
+    media: MediaWithVariants[];
 }
 
 @Injectable()
@@ -36,6 +47,36 @@ export class PostService {
         private readonly configService: ConfigService,
         private readonly databaseService: DatabaseService,
     ) {}
+
+    async findByIdWithVariants(id: string): Promise<PostWithVariants> {
+        const post = await this.findById(id);
+
+        const media = post.media.map((m): MediaWithVariants => {
+            if (m.status !== MediaStatus.READY || !m.url) {
+                return { ...m, variants: null };
+            }
+            switch (m.type) {
+                case MediaType.IMAGE:
+                    return {
+                        ...m,
+                        variants: this.cloudinaryService.getImageVariants(
+                            m.url,
+                        ),
+                    };
+                case MediaType.VIDEO:
+                    // video transformations (poster frames, adaptive bitrate) need different
+                    // parameters than images — not building that now, full url for all three
+                    // slots until there's a real consumer for video thumbnails specifically
+                    return {
+                        ...m,
+                        variants: this.cloudinaryService.getVideoPosterVariants(
+                            m.url,
+                        ),
+                    };
+            }
+        });
+        return { ...post, media };
+    }
 
     async create(authorId: string, dto: CreatePostDto): Promise<Post> {
         const status =
@@ -57,6 +98,14 @@ export class PostService {
             throw new ForbiddenException("you don't own this post");
         }
         await this.postRepo.delete(postId);
+    }
+
+    async restore(userId: string, postId: string): Promise<void> {
+        const post = await this.postRepo.findByIdIncludingDeleted(postId);
+        if (!post) throw new NotFoundException('post not found');
+        if (post.authorId !== userId)
+            throw new ForbiddenException("you don't own this post");
+        await this.postRepo.restore(postId); // idempotent if already active
     }
 
     private encodeCursor(cursor: FeedCursor): string {
@@ -176,6 +225,7 @@ export class PostService {
     }
 
     async like(userId: string, postId: string): Promise<void> {
+        await this.findById(postId); // re-added — FK no longer proves "not deleted", only "exists"
         await this.databaseService.transaction(async (manager) => {
             try {
                 await manager.insert(PostLike, { userId, postId });

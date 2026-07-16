@@ -40,9 +40,6 @@ export class PostMedia {
     })
     url: string | null;
 
-    @Column({ type: 'text', nullable: true })
-    thumbnailUrl: string | null;
-
     @Column({ type: 'enum', enum: MediaStatus, default: MediaStatus.UPLOADING })
     status: MediaStatus;
 

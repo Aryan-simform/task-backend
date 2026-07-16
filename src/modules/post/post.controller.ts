@@ -82,4 +82,12 @@ export class PostController {
     ): Promise<void> {
         return this.postService.unlike(userId, id);
     }
+
+    @HttpPost(':id/restore')
+    async restore(
+        @CurrentUser('sub') userId: string,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<void> {
+        return this.postService.restore(userId, id);
+    }
 }
