@@ -39,6 +39,18 @@ export class FollowRepository {
         return count > 0;
     }
 
+    async countFollowers(userId: string): Promise<number> {
+        return this.repo.count({
+            where: { followingId: userId, status: FollowStatus.ACCEPTED },
+        });
+    }
+
+    async countFollowing(userId: string): Promise<number> {
+        return this.repo.count({
+            where: { followerId: userId, status: FollowStatus.ACCEPTED },
+        });
+    }
+
     private applyCursor(
         qb: SelectQueryBuilder<Follow>,
         cursor: FollowCursor | null,

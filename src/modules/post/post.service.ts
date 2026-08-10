@@ -24,6 +24,8 @@ import {
     PG_UNIQUE_VIOLATION,
 } from '../../common/utils/postgres-error.util';
 import { MediaVariants } from '../cloudinary/cloudinary.service';
+import { CacheService } from '../../common/cache/cache.service';
+import { CACHE_TTL, cacheKeys } from '../../common/cache/cache.constants';
 
 export interface FeedPage {
     data: Post[];
@@ -46,6 +48,7 @@ export class PostService {
         private readonly cloudinaryService: CloudinaryService,
         private readonly configService: ConfigService,
         private readonly databaseService: DatabaseService,
+        private readonly cacheService: CacheService,
     ) {}
 
     async findByIdWithVariants(id: string): Promise<PostWithVariants> {
@@ -97,7 +100,7 @@ export class PostService {
         if (post.authorId !== userId) {
             throw new ForbiddenException("you don't own this post");
         }
-        await this.postRepo.delete(postId);
+        await this.postRepo.softDelete(postId);
     }
 
     async restore(userId: string, postId: string): Promise<void> {
@@ -132,32 +135,58 @@ export class PostService {
         }
     }
 
-    async getFeed(query: FeedQueryDto): Promise<FeedPage> {
+    async getFeed(viewerId: string, query: FeedQueryDto): Promise<FeedPage> {
         const limit = query.limit ?? 20;
-
         const cursor = query.cursor ? this.decodeCursor(query.cursor) : null;
 
-        const rows = await this.postRepo.findFeedPage(cursor, limit + 1);
-
-        const hasMore = rows.length > limit;
-
-        const data = hasMore ? rows.slice(0, limit) : rows;
-
-        let nextCursor: string | null = null;
-
-        if (hasMore) {
-            const last = data[data.length - 1];
-
-            nextCursor = this.encodeCursor({
-                createdAt: last.createdAt,
-                id: last.id,
-            });
+        // only the first page is worth caching — deeper pages are rarely
+        // re-requested and would multiply key cardinality for little benefit.
+        const cacheKey = cursor
+            ? null
+            : cacheKeys.feedFirstPage(viewerId, limit);
+        if (cacheKey) {
+            const cached = await this.cacheService.get<FeedPage>(cacheKey);
+            if (cached) return cached;
         }
 
-        return {
-            data,
-            nextCursor,
-        };
+        const rows = await this.postRepo.findFeedPage(
+            cursor,
+            limit + 1,
+            viewerId,
+        );
+        const hasMore = rows.length > limit;
+        const data = hasMore ? rows.slice(0, limit) : rows;
+        const nextCursor = hasMore
+            ? this.encodeCursor({
+                  createdAt: data[data.length - 1].createdAt,
+                  id: data[data.length - 1].id,
+              })
+            : null;
+        const page: FeedPage = { data, nextCursor };
+
+        // short TTL, no write-side invalidation: busting every follower's
+        // cached feed on a new post (fan-out-on-write) is the harder problem
+        // the task spec splits out separately — bound staleness with TTL instead.
+        if (cacheKey)
+            await this.cacheService.set(
+                cacheKey,
+                page,
+                CACHE_TTL.FEED_FIRST_PAGE,
+            );
+
+        return page;
+    }
+
+    async getLikesCount(postId: string): Promise<number> {
+        const cacheKey = cacheKeys.postLikesCount(postId);
+        const cached = await this.cacheService.get<number>(cacheKey);
+        if (cached !== null) return cached;
+
+        const count = await this.postRepo.getLikesCount(postId);
+        if (count === null) throw new NotFoundException('post not found');
+
+        await this.cacheService.set(cacheKey, count, CACHE_TTL.LIKES_COUNT);
+        return count;
     }
 
     async requestMediaUpload(
@@ -238,6 +267,7 @@ export class PostService {
             }
             await manager.increment(Post, { id: postId }, 'likesCount', 1);
         });
+        await this.cacheService.del(cacheKeys.postLikesCount(postId));
     }
 
     async unlike(userId: string, postId: string): Promise<void> {
@@ -246,5 +276,6 @@ export class PostService {
             if (result.affected && result.affected > 0)
                 await manager.decrement(Post, { id: postId }, 'likesCount', 1);
         });
+        await this.cacheService.del(cacheKeys.postLikesCount(postId));
     }
 }

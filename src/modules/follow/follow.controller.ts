@@ -59,11 +59,25 @@ export class FollowController {
         return this.followService.getFollowers(userId, query);
     }
 
+    @Get('followers/:userId/count')
+    async getFollowerCount(
+        @Param('userId', ParseUUIDPipe) userId: string,
+    ): Promise<{ count: number }> {
+        return { count: await this.followService.getFollowerCount(userId) };
+    }
+
     @Get('following/:userId')
     async getFollowing(
         @Param('userId', ParseUUIDPipe) userId: string,
         @Query() query: FeedQueryDto,
     ): Promise<FollowPage> {
         return this.followService.getFollowing(userId, query);
+    }
+
+    @Get('following/:userId/count')
+    async getFollowingCount(
+        @Param('userId', ParseUUIDPipe) userId: string,
+    ): Promise<{ count: number }> {
+        return { count: await this.followService.getFollowingCount(userId) };
     }
 }

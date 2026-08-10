@@ -7,6 +7,7 @@ import {
     ParseUUIDPipe,
     Post as HttpPost,
     Query,
+    UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PostService, FeedPage } from './post.service';
@@ -15,6 +16,7 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { FeedQueryDto } from './dto/feed-query.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequestMediaUploadDto } from './dto/request-media-upload.dto';
+import { PostPrivacyGuard } from '../../common/guards/post-privacy.guard';
 
 @ApiTags('posts')
 @ApiBearerAuth()
@@ -31,13 +33,26 @@ export class PostController {
     }
 
     @Get('feed')
-    async getFeed(@Query() query: FeedQueryDto): Promise<FeedPage> {
-        return this.postService.getFeed(query);
+    async getFeed(
+        @CurrentUser('sub') userId: string,
+        @Query() query: FeedQueryDto,
+    ): Promise<FeedPage> {
+        return this.postService.getFeed(userId, query);
     }
 
+    @UseGuards(PostPrivacyGuard)
     @Get(':id')
     async findOne(@Param('id', ParseUUIDPipe) id: string): Promise<Post> {
         return this.postService.findById(id);
+    }
+
+    @UseGuards(PostPrivacyGuard)
+    @Get(':id/likes/count')
+    async getLikesCount(
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<{ count: number }> {
+        const count = await this.postService.getLikesCount(id);
+        return { count };
     }
 
     @Delete(':id')

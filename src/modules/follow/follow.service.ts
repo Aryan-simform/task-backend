@@ -11,6 +11,8 @@ import { Follow, FollowStatus } from './entities/follow.entity';
 import { UserService } from '../user/user.service';
 import { FollowCursor } from './interfaces/followCursor.interface';
 import { FeedQueryDto } from '../post/dto/feed-query.dto';
+import { CacheService } from '../../common/cache/cache.service';
+import { CACHE_TTL, cacheKeys } from '../../common/cache/cache.constants';
 
 export interface FollowPage {
     data: Follow[];
@@ -23,7 +25,18 @@ export class FollowService {
         private readonly followRepo: FollowRepository,
         @Inject(forwardRef(() => UserService))
         private readonly userService: UserService,
+        private readonly cacheService: CacheService,
     ) {}
+
+    private async invalidateFollowCounts(
+        followerId: string,
+        followingId: string,
+    ): Promise<void> {
+        await Promise.all([
+            this.cacheService.del(cacheKeys.followerCount(followingId)),
+            this.cacheService.del(cacheKeys.followingCount(followerId)),
+        ]);
+    }
 
     async follow(followerId: string, followingId: string): Promise<Follow> {
         if (followingId === followerId)
@@ -36,11 +49,17 @@ export class FollowService {
             : FollowStatus.ACCEPTED;
 
         try {
-            return await this.followRepo.create({
+            const follow = await this.followRepo.create({
                 followerId,
                 followingId,
                 status,
             });
+            // only an immediate accept (public target) changes the accepted
+            // counts — a pending request doesn't, but invalidating anyway is
+            // a cheap no-op and keeps this branch simple.
+            if (status === FollowStatus.ACCEPTED)
+                await this.invalidateFollowCounts(followerId, followingId);
+            return follow;
         } catch (err) {
             if ((err as { code?: string }).code === '23505')
                 throw new ConflictException('already follwoing or requested');
@@ -50,6 +69,7 @@ export class FollowService {
 
     async unfollow(followerId: string, followingId: string): Promise<void> {
         await this.followRepo.delete(followerId, followingId);
+        await this.invalidateFollowCounts(followerId, followingId);
     }
 
     async accept(targetUserId: string, requesterId: string): Promise<void> {
@@ -57,12 +77,34 @@ export class FollowService {
         if (!follow) throw new NotFoundException('follow request not found');
         if (follow.status === FollowStatus.ACCEPTED) return; // idempotent
         await this.followRepo.updateStatus(follow.id, FollowStatus.ACCEPTED);
+        await this.invalidateFollowCounts(requesterId, targetUserId);
     }
 
     async reject(targetUserId: string, requesterId: string): Promise<void> {
         const follow = await this.followRepo.findOne(requesterId, targetUserId);
         if (!follow) throw new NotFoundException('follow request not found');
         await this.followRepo.delete(requesterId, targetUserId);
+        await this.invalidateFollowCounts(requesterId, targetUserId);
+    }
+
+    async getFollowerCount(userId: string): Promise<number> {
+        const cacheKey = cacheKeys.followerCount(userId);
+        const cached = await this.cacheService.get<number>(cacheKey);
+        if (cached !== null) return cached;
+
+        const count = await this.followRepo.countFollowers(userId);
+        await this.cacheService.set(cacheKey, count, CACHE_TTL.FOLLOW_COUNT);
+        return count;
+    }
+
+    async getFollowingCount(userId: string): Promise<number> {
+        const cacheKey = cacheKeys.followingCount(userId);
+        const cached = await this.cacheService.get<number>(cacheKey);
+        if (cached !== null) return cached;
+
+        const count = await this.followRepo.countFollowing(userId);
+        await this.cacheService.set(cacheKey, count, CACHE_TTL.FOLLOW_COUNT);
+        return count;
     }
 
     // used by PrivacyGuard — closes the TODO from earlier

@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post, PostStatus } from '../entities/post.entity';
 import { PostMedia } from '../entities/post-media.entity';
+import { FollowStatus } from '../../follow/entities/follow.entity';
+
 import { IsNull } from 'typeorm';
 export interface FeedCursor {
     createdAt: Date;
@@ -34,6 +36,14 @@ export class PostRepository {
         });
     }
 
+    async getLikesCount(id: string): Promise<number | null> {
+        const post = await this.repo.findOne({
+            where: { id, deletedAt: IsNull() },
+            select: ['id', 'likesCount'],
+        });
+        return post ? post.likesCount : null;
+    }
+
     async findByIdIncludingDeleted(id: string): Promise<Post | null> {
         return this.repo.findOne({ where: { id }, relations: ['media'] });
     }
@@ -53,21 +63,33 @@ export class PostRepository {
     async findFeedPage(
         cursor: FeedCursor | null,
         limit: number,
+        viewerId: string,
     ): Promise<Post[]> {
-        const queryBuilder = this.repo
+        const qb = this.repo
             .createQueryBuilder('post')
             .leftJoinAndSelect('post.media', 'media')
-            .where('post.deletedAt IS NULL');
+            .innerJoin('post.author', 'author')
+            .where('post.deletedAt IS NULL')
+            .andWhere(
+                `(author."isPrivate" = false
+        OR author.id = :viewerId
+        OR EXISTS (
+          SELECT 1 FROM follows f
+          WHERE f."followerId" = :viewerId
+            AND f."followingId" = author.id
+            AND f.status = :acceptedStatus
+        ))`,
+                { viewerId, acceptedStatus: FollowStatus.ACCEPTED },
+            );
+
         if (cursor) {
-            queryBuilder.andWhere(
-                '(post.createdAt,post.id)< (:createdAt,:id)',
-                {
-                    createdAt: cursor.createdAt,
-                    id: cursor.id,
-                },
+            qb.andWhere(
+                `(post.createdAt < :createdAt OR (post.createdAt = :createdAt AND post.id < :id))`,
+                { createdAt: cursor.createdAt, id: cursor.id },
             );
         }
-        return queryBuilder
+
+        return qb
             .orderBy('post.createdAt', 'DESC')
             .addOrderBy('post.id', 'DESC')
             .take(limit)

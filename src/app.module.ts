@@ -20,6 +20,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { FollowModule } from './modules/follow/follow.module';
 import { PostModule } from './modules/post/post.module';
 import { CommentModule } from './modules/comment/comment.module';
+import { AppCacheModule } from './common/cache/cache.module';
 @Module({
     controllers: [AppController],
     providers: [
@@ -47,6 +48,7 @@ import { CommentModule } from './modules/comment/comment.module';
                 },
             }),
         }),
+        AppCacheModule,
         DatabaseModule,
         UserModule,
         AuthModule,
